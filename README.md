@@ -431,3 +431,123 @@ export function Counter() {
 4: Xử lý gọi phương thức `incrementByAmount` từ reducer, và truyền vào giá 20. (20 này sẽ được đọc tại reducer thông qua `action.payload` ở **B4**)
 
 5: Dùng `setTimeout` để xử lý delay bất đồng bộ trước khi phát giá trị.
+
+
+
+### 2.8/ Redux Saga:
+
+Ý nghĩa tương tự Redux, nhưng cách implement nó sẽ khác 1 chút.
+
+**Cài đặt**
+
+```shell
+ npm install redux-saga
+```
+
+
+
+Bác bước để implement Redux Saga sẽ tập trung cơ bản ở 3 phần: Reducers, Sagas, App root.
+
+**Phần 1:** Reducers
+
+Đây sẽ là nơi khai báo các reducer, bao gồm giá trị mặc định, xử lý theo từng loại action thông qua switch case giá trị type truyền vào.
+
+*Notes: Ở trường hợp `default` mình có thể hiểu đơn giản là chỗ này sẽ trả về giá trị sau này sẽ lấy ra (dùng thông qua `store.getState()` sẽ được mô tả ở các bước sau). Nó bao gồm giá trị thực tế từ state hiện tại + thêm logic nếu có xử lý ở đây.*
+
+```react
+// reducers.js
+export function counterReducer(state = 0, action) {
+  switch (action.type) {
+    case 'INCREMENT':
+      return state + action.payload
+    case 'DECREMENT':
+      return state - 1
+    default:
+      return state
+  }
+}
+
+export function anotherReducer(sate = "empty", action) {
+    ...
+}
+```
+
+**Phần 2:** Sagas
+
+```react
+// sagas.js
+import { all, call, delay, put, takeEvery } from 'redux-saga/effects'
+
+export function* incrementAsync(action) {
+  // 1
+  yield delay(1000)
+  yield put({type: 'INCREMENT', payload: action.payload})
+}
+
+export function* watchIncrementAsync() {
+  // 2
+  yield takeEvery('INCREMENT_ASYNC', incrementAsync)
+}
+
+export default function* rootSaga() {
+  yield all([
+    // 3
+    call(watchIncrementAsync),
+  ])
+}
+```
+
+**1:** Ở đây sẽ xử lý delay 1s, code ở đây sẽ chạy đồng bộ nên sau 1s hoàn thành delay thì `yield put...` mới được thực thi.
+
+**2:** `takeEvery` ở đây là nó sẽ bắt tất cả action có `type` là `"INCREMENT_ASYNC"`, và khởi chạy hàm `incrementAsync` cho action đó.
+
+**3:** `call`: Gán việc nhận biết các tín hiệu từ function `watchIncrementAsync`.
+
+*Từ khóa:* `function*`: Generator function, `yield`: Xử lý các tác vụ bất đồng bộ.
+
+**Phần 3:** App root
+
+```react
+import { createStore, applyMiddleware } from 'redux';
+import createSagaMiddleware from 'redux-saga';
+import { counterReducer } from './reducers';
+import rootSaga from './sagas';
+const rootElement = document.getElementById('root');
+const root = createRoot(rootElement);
+
+// 1
+const sagaMiddleware = createSagaMiddleware()
+
+// 2
+export const counterStore = createStore(
+  counterReducer,
+  applyMiddleware(sagaMiddleware)
+)
+
+// 3
+sagaMiddleware.run(rootSaga)
+
+function render() {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
+
+render()
+
+// 4
+counterStore.subscribe(render)
+```
+
+**1**: Khởi tạo 1 saga middleware.
+
+**2**: Tạo 1 store, liên kết với reducer & saga middleware.
+
+**3**: Chạy saga middlewware với root.
+
+**4**: Đăng ký store cho hàm render App. (Quan trọng)
+
+*[Tài liệu tham khảo - Redux saga org](https://redux-saga.js.org/docs/introduction/BeginnerTutorial/)*
+
